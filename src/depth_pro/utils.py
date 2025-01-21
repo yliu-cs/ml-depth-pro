@@ -110,3 +110,47 @@ def load_rgb(
         f_px = None
 
     return img, icc_profile, f_px
+
+
+def load_pil(
+    img_pil: Any, auto_rotate: bool = True, remove_alpha: bool = True
+) -> Tuple[np.ndarray, List[bytes], float]:
+    img_exif = extract_exif(img_pil)
+    icc_profile = img_pil.info.get("icc_profile", None)
+
+    # Rotate the image.
+    if auto_rotate:
+        exif_orientation = img_exif.get("Orientation", 1)
+        if exif_orientation == 3:
+            img_pil = img_pil.transpose(Image.ROTATE_180)
+        elif exif_orientation == 6:
+            img_pil = img_pil.transpose(Image.ROTATE_270)
+        elif exif_orientation == 8:
+            img_pil = img_pil.transpose(Image.ROTATE_90)
+        elif exif_orientation != 1:
+            LOGGER.warning(f"Ignoring image orientation {exif_orientation}.")
+
+    img = np.array(img_pil)
+    # Convert to RGB if single channel.
+    if img.ndim < 3 or img.shape[2] == 1:
+        img = np.dstack((img, img, img))
+
+    if remove_alpha:
+        img = img[:, :, :3]
+
+    LOGGER.debug(f"\tHxW: {img.shape[0]}x{img.shape[1]}")
+
+    # Extract the focal length from exif data.
+    f_35mm = img_exif.get(
+        "FocalLengthIn35mmFilm",
+        img_exif.get(
+            "FocalLenIn35mmFilm", img_exif.get("FocalLengthIn35mmFormat", None)
+        ),
+    )
+    if f_35mm is not None and f_35mm > 0:
+        LOGGER.debug(f"\tfocal length @ 35mm film: {f_35mm}mm")
+        f_px = fpx_from_f35(img.shape[1], img.shape[0], f_35mm)
+    else:
+        f_px = None
+
+    return img, icc_profile, f_px

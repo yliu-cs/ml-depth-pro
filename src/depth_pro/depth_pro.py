@@ -31,7 +31,6 @@ class DepthProConfig:
     image_encoder_preset: ViTPreset
     decoder_features: int
 
-    checkpoint_uri: Optional[str] = None
     fov_encoder_preset: Optional[ViTPreset] = None
     use_fov_head: bool = True
 
@@ -39,7 +38,6 @@ class DepthProConfig:
 DEFAULT_MONODEPTH_CONFIG_DICT = DepthProConfig(
     patch_encoder_preset="dinov2l16_384",
     image_encoder_preset="dinov2l16_384",
-    checkpoint_uri="./checkpoints/depth_pro.pt",
     decoder_features=256,
     use_fov_head=True,
     fov_encoder_preset="dinov2l16_384",
@@ -73,8 +71,9 @@ def create_model_and_transforms(
     config: DepthProConfig = DEFAULT_MONODEPTH_CONFIG_DICT,
     device: torch.device = torch.device("cpu"),
     precision: torch.dtype = torch.float32,
+    checkpoint_uri: Union[str, None] = None,
 ) -> Tuple[DepthPro, Compose]:
-    """Create a DepthPro model and load weights from `config.checkpoint_uri`.
+    """Create a DepthPro model and load weights from `checkpoint_uri`.
 
     Args:
     ----
@@ -131,8 +130,8 @@ def create_model_and_transforms(
         ]
     )
 
-    if config.checkpoint_uri is not None:
-        state_dict = torch.load(config.checkpoint_uri, map_location="cpu")
+    if checkpoint_uri is not None:
+        state_dict = torch.load(checkpoint_uri, map_location="cpu")
         missing_keys, unexpected_keys = model.load_state_dict(
             state_dict=state_dict, strict=True
         )
